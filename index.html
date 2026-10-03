@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客戶管理系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#1f2430; --muted:#6b7280; --line:#e5e7eb; --brand:#0f766e; --warn:#b45309; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --card:#1d2128; --text:#e8eaee; --muted:#9aa1ad; --line:#2d333d; --brand:#2dd4bf; --warn:#fbbf24; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,"Microsoft JhengHei",sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:12px 16px; display:flex; gap:12px; align-items:center; }
+  header h1 { font-size:17px; margin:0; flex:1; cursor:pointer; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px; }
+  input, select, textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 3px; }
+  button { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); font:inherit; cursor:pointer; }
+  button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+  button.link { border:0; background:none; color:var(--brand); padding:2px 6px; }
+  .search { font-size:17px; padding:12px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1 1 180px; }
+  .hit { padding:10px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .hit:hover { background:var(--bg); }
+  .muted { color:var(--muted); font-size:13px; }
+  .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid var(--line); margin-right:6px; }
+  .tag.warn { color:var(--warn); border-color:var(--warn); }
+  .ago { color:var(--brand); font-size:13px; }
+  .tl { border-left:2px solid var(--line); margin-left:6px; padding-left:14px; }
+  .tl > div { padding:8px 0; position:relative; }
+  .tl > div::before { content:""; position:absolute; left:-20px; top:14px; width:10px; height:10px; border-radius:50%; background:var(--brand); }
+  .hide { display:none; }
+  .err { color:#dc2626; font-size:13px; }
+  h3 { margin:0 0 8px; font-size:15px; }
+</style>
+</head>
+<body>
+<header><h1 onclick="showSearch()">🚲 客戶管理系統</h1><span id="who" class="muted"></span><button id="logout" class="hide" onclick="logout()">登出</button></header>
+<main id="app"></main>
+
+<script>
+const SUPABASE_URL = "https://yotdiyaupuonioqzsvqp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_9JDwV7XR-4TGHdoal-62GQ_zJARtMg1";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = n => n == null || n === "" ? "—" : "NT$ " + Number(n).toLocaleString();
+
+// 距今多久
+function ago(d) {
+  if (!d) return "";
+  const days = Math.floor((new Date() - new Date(d + "T00:00:00")) / 86400000);
+  if (days < 0) return "未來 " + (-days) + " 天";
+  if (days === 0) return "今天";
+  if (days < 31) return days + " 天前";
+  const m = Math.floor(days / 30.4375);
+  if (m < 12) return m + " 個月前";
+  const y = Math.floor(m / 12), r = m % 12;
+  return y + " 年" + (r ? " " + r + " 個月" : "") + "前";
+}
+
+// ---------- 登入 ----------
+async function init() {
+  const { data } = await db.auth.getSession();
+  if (data.session) { onLogin(data.session); } else showLogin();
+}
+function showLogin(msg) {
+  document.getElementById("logout").classList.add("hide");
+  document.getElementById("who").textContent = "";
+  $app.innerHTML = `<div class="card" style="max-width:360px;margin:40px auto">
+    <h3>登入</h3>
+    <label>Email</label><input id="em" type="email">
+    <label>密碼</label><input id="pw" type="password">
+    <p class="err">${esc(msg || "")}</p>
+    <div class="row"><button class="primary" onclick="login()">登入</button><button onclick="signup()">首次使用：註冊</button></div></div>`;
+}
+async function login() {
+  const { data, error } = await db.auth.signInWithPassword({ email: em.value, password: pw.value });
+  if (error) return showLogin("登入失敗：" + error.message);
+  onLogin(data.session);
+}
+async function signup() {
+  const { error } = await db.auth.signUp({ email: em.value, password: pw.value });
+  if (error) return showLogin("註冊失敗：" + error.message);
+  showLogin("註冊完成，請直接登入（若需要驗證信，請先到信箱確認）。");
+}
+async function logout() { await db.auth.signOut(); showLogin(); }
+function onLogin(session) {
+  document.getElementById("who").textContent = session.user.email;
+  document.getElementById("logout").classList.remove("hide");
+  showSearch();
+}
+
+// ---------- 搜尋 ----------
+let timer;
+function showSearch() {
+  $app.innerHTML = `<div class="card"><input id="q" class="search" placeholder="輸入姓名、電話或車款…" autofocus oninput="clearTimeout(timer);timer=setTimeout(search,250)">
+    <div id="hits" style="margin-top:10px"></div></div>
+    <button class="primary" onclick="editCustomer()">＋ 新增客戶</button>`;
+  search();
+}
+async function search() {
+  const q = document.getElementById("q").value.trim().replace(/[,()%]/g, " ");
+  let ids = null;
+  if (q) {
+    const [a, b] = await Promise.all([
+      db.from("customers").select("id").or(`name.ilike.%${q}%,phone.ilike.%${q}%`),
+      db.from("bikes").select("customer_id").ilike("model", `%${q}%`)
+    ]);
+    ids = [...new Set([...(a.data || []).map(x => x.id), ...(b.data || []).map(x => x.customer_id)])];
+  }
+  let req = db.from("customers").select("id,name,phone,bikes(model)").order("created_at", { ascending: false }).limit(30);
+  if (ids) req = ids.length ? req.in("id", ids) : null;
+  const { data } = req ? await req : { data: [] };
+  document.getElementById("hits").innerHTML = (data || []).map(c =>
+    `<div class="hit" onclick="showCustomer('${c.id}')"><b>${esc(c.name)}</b> <span class="muted">${esc(c.phone || "")}</span>
+     <div class="muted">${(c.bikes || []).map(b => esc(b.model)).join("、") || "尚無車輛"}</div></div>`).join("")
+    || `<p class="muted">找不到符合的客戶</p>`;
+}
+
+// ---------- 客戶詳情 ----------
+async function showCustomer(id) {
+  const [c, b, s] = await Promise.all([
+    db.from("customers").select("*").eq("id", id).single(),
+    db.from("bikes").select("*").eq("customer_id", id).order("purchase_date", { ascending: false }),
+    db.from("service_records").select("*").eq("customer_id", id).order("record_date", { ascending: false })
+  ]);
+  const cu = c.data, bikes = b.data || [], recs = s.data || [];
+  const bikeName = bid => (bikes.find(x => x.id === bid) || {}).model || "";
+  const open = recs.filter(r => r.status !== "已完成").length;
+  $app.innerHTML = `
+  <button class="link" onclick="showSearch()">← 回搜尋</button>
+  <div class="card">
+    <div class="row" style="align-items:center"><h3 style="flex:3">${esc(cu.name)} ${open ? `<span class="tag warn">${open} 件未完成</span>` : ""}</h3>
+      <button onclick="editCustomer('${id}')">編輯</button></div>
+    <div>📞 ${esc(cu.phone || "—")}　✉️ ${esc(cu.email || "—")}</div>
+    <div class="muted">${esc(cu.address || "")}</div>
+    ${cu.notes ? `<div style="margin-top:6px">📝 ${esc(cu.notes)}</div>` : ""}
+  </div>
+  <div class="card"><div class="row" style="align-items:center"><h3 style="flex:3">名下車輛</h3><button onclick="editBike('${id}')">＋ 新增車輛</button></div>
+    ${bikes.map(x => `<div class="hit" onclick="editBike('${id}','${x.id}')"><b>${esc(x.model)}</b> <span class="muted">序號 ${esc(x.serial_no || "—")}</span>
+      <div class="muted">購買 ${esc(x.purchase_date || "—")} <span class="ago">${ago(x.purchase_date)}</span>　${money(x.purchase_price)}　保固至 ${esc(x.warranty_until || "—")}</div></div>`).join("") || `<p class="muted">尚無車輛</p>`}
+  </div>
+  <div class="card"><div class="row" style="align-items:center"><h3 style="flex:3">歷史紀錄</h3><button class="primary" onclick="editRecord('${id}')">＋ 新增紀錄</button></div>
+    <div class="tl">${recs.map(r => `<div><span class="tag">${esc(r.type)}</span><span class="tag ${r.status !== "已完成" ? "warn" : ""}">${esc(r.status)}</span>
+      <b>${esc(r.record_date)}</b> <span class="ago">${ago(r.record_date)}</span>
+      <button class="link" onclick="editRecord('${id}','${r.id}')">編輯</button>
+      <div>${esc(r.content || "")}</div><div class="muted">${esc(bikeName(r.bike_id))} ${r.price != null ? "　" + money(r.price) : ""}</div></div>`).join("") || `<p class="muted">尚無紀錄</p>`}</div>
+  </div>`;
+}
+
+// ---------- 表單 ----------
+function field(id, label, val, type = "text") { return `<label>${label}</label><input id="${id}" type="${type}" value="${esc(val)}">`; }
+function form(title, html, onsave, ondel) {
+  $app.innerHTML = `<div class="card"><h3>${title}</h3>${html}<p id="msg" class="err"></p>
+    <div class="row"><button class="primary" onclick="${onsave}">儲存</button><button onclick="history.go(0)">取消</button>
+    ${ondel ? `<button onclick="${ondel}">刪除</button>` : ""}</div></div>`;
+}
+const val = id => { const v = document.getElementById(id).value.trim(); return v === "" ? null : v; };
+
+async function editCustomer(id) {
+  const c = id ? (await db.from("customers").select("*").eq("id", id).single()).data : {};
+  form(id ? "編輯客戶" : "新增客戶",
+    field("f_name", "姓名 *", c.name) + field("f_phone", "電話", c.phone) + field("f_email", "Email", c.email) +
+    field("f_address", "地址", c.address) + `<label>備註</label><textarea id="f_notes" rows="3">${esc(c.notes)}</textarea>`,
+    `saveCustomer('${id || ""}')`, id ? `delCustomer('${id}')` : "");
+}
+async function saveCustomer(id) {
+  const row = { name: val("f_name"), phone: val("f_phone"), email: val("f_email"), address: val("f_address"), notes: val("f_notes") };
+  if (!row.name) return msg.textContent = "請輸入姓名";
+  const r = id ? await db.from("customers").update(row).eq("id", id).select().single() : await db.from("customers").insert(row).select().single();
+  if (r.error) return msg.textContent = r.error.message;
+  showCustomer(r.data.id);
+}
+async function delCustomer(id) {
+  if (!confirm("確定刪除此客戶？其車輛與所有紀錄也會一併刪除，無法復原。")) return;
+  await db.from("customers").delete().eq("id", id); showSearch();
+}
+
+async function editBike(cid, id) {
+  const b = id ? (await db.from("bikes").select("*").eq("id", id).single()).data : {};
+  form(id ? "編輯車輛" : "新增車輛",
+    field("f_model", "車款 *", b.model) + field("f_serial", "車身序號", b.serial_no) + field("f_pdate", "購買日期", b.purchase_date, "date") +
+    field("f_pprice", "購買價格", b.purchase_price, "number") + field("f_war", "保固到期日", b.warranty_until, "date"),
+    `saveBike('${cid}','${id || ""}')`, id ? `delBike('${cid}','${id}')` : "");
+}
+async function saveBike(cid, id) {
+  const row = { customer_id: cid, model: val("f_model"), serial_no: val("f_serial"), purchase_date: val("f_pdate"), purchase_price: val("f_pprice"), warranty_until: val("f_war") };
+  if (!row.model) return msg.textContent = "請輸入車款";
+  const r = id ? await db.from("bikes").update(row).eq("id", id) : await db.from("bikes").insert(row);
+  if (r.error) return msg.textContent = r.error.message;
+  showCustomer(cid);
+}
+async function delBike(cid, id) {
+  if (!confirm("確定刪除此車輛？（相關維修紀錄會保留，但不再關聯車輛）")) return;
+  await db.from("bikes").delete().eq("id", id); showCustomer(cid);
+}
+
+async function editRecord(cid, id) {
+  const [bk, rc] = await Promise.all([
+    db.from("bikes").select("id,model").eq("customer_id", cid),
+    id ? db.from("service_records").select("*").eq("id", id).single() : { data: {} }
+  ]);
+  const r = rc.data, opt = (list, cur) => list.map(x => `<option ${x === cur ? "selected" : ""}>${x}</option>`).join("");
+  form(id ? "編輯紀錄" : "新增紀錄",
+    `<label>類型</label><select id="f_type">${opt(["維修", "諮詢", "客訴", "其他"], r.type || "維修")}</select>
+     <label>相關車輛</label><select id="f_bike"><option value="">（無）</option>${(bk.data || []).map(x => `<option value="${x.id}" ${x.id === r.bike_id ? "selected" : ""}>${esc(x.model)}</option>`).join("")}</select>` +
+    field("f_date", "日期", r.record_date || new Date().toISOString().slice(0, 10), "date") +
+    `<label>內容</label><textarea id="f_content" rows="3">${esc(r.content)}</textarea>` +
+    field("f_price", "價格", r.price, "number") +
+    `<label>狀態</label><select id="f_status">${opt(["待處理", "維修中", "已完成"], r.status || "已完成")}</select>`,
+    `saveRecord('${cid}','${id || ""}')`, id ? `delRecord('${cid}','${id}')` : "");
+}
+async function saveRecord(cid, id) {
+  const row = { customer_id: cid, bike_id: val("f_bike"), type: val("f_type"), record_date: val("f_date"), content: val("f_content"), price: val("f_price"), status: val("f_status") };
+  const r = id ? await db.from("service_records").update(row).eq("id", id) : await db.from("service_records").insert(row);
+  if (r.error) return msg.textContent = r.error.message;
+  showCustomer(cid);
+}
+async function delRecord(cid, id) {
+  if (!confirm("確定刪除此紀錄？")) return;
+  await db.from("service_records").delete().eq("id", id); showCustomer(cid);
+}
+
+init();
+</script>
+</body>
+</html>

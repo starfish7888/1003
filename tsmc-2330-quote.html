@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>台積電 2330 今日行情速報</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* 版面概念：單欄公報式。最上面是收盤報價，中間是逐項標日期與來源的資料表，最下面是新聞與免責聲明。 */
+:root {
+  --bg: #eef1f3;
+  --surface: #ffffff;
+  --fg: #17212b;
+  --muted: #566472;
+  --line: #d5dce2;
+  --accent: #1d4e89;
+  --down: #0b7a43;
+  --down-bg: #e1f2e8;
+  --up: #c62828;
+  --warn-bg: #fff4d6;
+  --warn-fg: #6b4b00;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f161c;
+    --surface: #172029;
+    --fg: #e6ebef;
+    --muted: #9aa7b3;
+    --line: #2a3640;
+    --accent: #7fb2f0;
+    --down: #4cc38a;
+    --down-bg: #12301f;
+    --up: #ff7a70;
+    --warn-bg: #3a2f10;
+    --warn-fg: #f2d58a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f161c;
+  --surface: #172029;
+  --fg: #e6ebef;
+  --muted: #9aa7b3;
+  --line: #2a3640;
+  --accent: #7fb2f0;
+  --down: #4cc38a;
+  --down-bg: #12301f;
+  --up: #ff7a70;
+  --warn-bg: #3a2f10;
+  --warn-fg: #f2d58a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 880px; margin-inline: auto; padding-inline: 16px; padding-block: 28px 40px; display: flex; flex-direction: column; gap: 20px; }
+
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }
+h1 { margin: 4px 0 6px; font-size: clamp(26px, 5.5vw, 36px); line-height: 1.25; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+
+section { min-width: 0; }
+h2 { margin: 0 0 12px; font-size: 17px; line-height: 1.4; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+
+/* 報價區 */
+.quote { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; }
+.label { margin: 0; font-size: 13px; color: var(--muted); }
+.price { margin: 2px 0 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.price .num { font-size: clamp(44px, 11vw, 64px); font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; }
+.price .unit { font-size: 18px; color: var(--muted); }
+.chg { margin: 0 0 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; padding: 3px 12px; border-radius: 999px; }
+.pill.down { color: var(--down); background: var(--down-bg); }
+.src { margin: 0; font-size: 12.5px; color: var(--muted); }
+.side { margin: 0; display: flex; flex-direction: column; gap: 14px; border-left: 1px solid var(--line); padding-left: 24px; min-width: 0; }
+.side div { display: flex; flex-direction: column; gap: 0; }
+.side dt { font-size: 13px; color: var(--muted); }
+.side dd { margin: 0; }
+.side .big { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600; }
+.side .small { font-size: 12.5px; color: var(--muted); }
+.convention { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
+
+/* 區間圖 */
+.chart-wrap { overflow-x: auto; }
+svg.range { display: block; width: 100%; min-width: 520px; height: auto; }
+svg.range text { fill: var(--fg); font-family: var(--font-body); font-size: 13px; }
+svg.range .mono { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+svg.range .axis-text { fill: var(--muted); font-size: 12px; }
+svg.range .axis { stroke: var(--line); stroke-width: 1; fill: none; }
+svg.range .bar { fill: var(--accent); fill-opacity: 0.18; stroke: var(--accent); stroke-width: 1; }
+svg.range .stem { stroke: var(--muted); stroke-width: 1; fill: none; }
+svg.range .prev { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; fill: none; }
+svg.range .m-close { fill: var(--down); stroke: var(--surface); stroke-width: 2; }
+svg.range .m-open { fill: var(--surface); stroke: var(--fg); stroke-width: 2; }
+.cap { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+
+/* 資料表 */
+.table-wrap { min-width: 0; }
+table.data { width: 100%; border-collapse: collapse; }
+table.data th { text-align: left; font-size: 12.5px; font-weight: 500; color: var(--muted); padding: 0 12px 8px 0; border-bottom: 1px solid var(--line); }
+table.data td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.data tr:last-child td { border-bottom: 0; }
+table.data td.k { font-weight: 500; white-space: nowrap; }
+table.data td.v { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; }
+table.data td.v small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12.5px; color: var(--muted); }
+table.data td.d { white-space: nowrap; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+table.data td.s { font-size: 13px; min-width: 0; }
+.dn { color: var(--down); }
+
+.note { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn-fg); font-size: 13.5px; }
+.note b { font-weight: 700; }
+
+/* 新聞 */
+.news { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.news li { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; background: var(--bg); }
+.news .meta { font-size: 12.5px; color: var(--muted); }
+.news .meta .num { font-size: 12.5px; }
+.news h3 { margin: 0; font-size: 15.5px; line-height: 1.5; text-wrap: balance; }
+.news p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.news .link { margin-top: auto; font-size: 13px; overflow-wrap: anywhere; }
+
+footer { border-top: 2px solid var(--fg); padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.disclaimer { margin: 0; font-size: 17px; font-weight: 700; }
+footer p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .quote { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .side { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 16px; flex-direction: row; flex-wrap: wrap; gap: 14px 28px; }
+  .news { grid-template-columns: minmax(0, 1fr); }
+  .panel { padding: 16px; }
+  table.data thead { display: none; }
+  table.data tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  table.data tr:last-child { border-bottom: 0; }
+  table.data td { display: block; padding: 0; border: 0; }
+  table.data td.k { grid-column: 1; }
+  table.data td.v { grid-column: 2; text-align: right; }
+  table.data td.d, table.data td.s { grid-column: 1 / -1; white-space: normal; margin-top: 2px; }
+  table.data td.d::before { content: "資料日 "; font-family: var(--font-body); }
+  table.data td.s::before { content: "來源 "; color: var(--muted); }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <p class="eyebrow">台股個股行情速報　臺灣證券交易所上市</p>
+    <h1>台積電 2330 今日行情速報</h1>
+    <p class="lede">查詢日 2026-10-03（週六）休市，以下是最近一個交易日 2026-10-02（週五）的資料。數字都直接寫在這個檔案裡，不會自動更新。</p>
+  </header>
+
+  <section class="panel quote" aria-labelledby="h-quote">
+    <div>
+      <h2 id="h-quote" class="sr">收盤報價</h2>
+      <p class="label">收盤價（2026-10-02）</p>
+      <p class="price"><span class="num">2,500.00</span><span class="unit">元</span></p>
+      <p class="chg">
+        <span class="pill down">▼ 10.00（−0.40%）</span>
+        <span>較前一交易日收盤 2,510.00 元下跌</span>
+      </p>
+      <p class="src">資料日 2026-10-02　來源：<a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所</a></p>
+      <p class="convention">台股慣例：上漲標紅、下跌標綠。</p>
+    </div>
+    <dl class="side">
+      <div>
+        <dt>成交量（2026-10-02）</dt>
+        <dd class="big">15,792 張</dd>
+        <dd class="small">15,792,206 股，含零股、盤後定價、鉅額。來源：證交所</dd>
+      </div>
+      <div>
+        <dt>成交金額（2026-10-02）</dt>
+        <dd class="big">395.08 億元</dd>
+        <dd class="small">39,508,159,297 元。來源：證交所</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="panel" aria-labelledby="h-range">
+    <h2 id="h-range">當日價格區間</h2>
+    <div class="chart-wrap">
+      <svg class="range" viewBox="0 0 700 190" role="img" aria-label="2026-10-02 台積電價格區間：最低 2,495 元，最高 2,515 元，開盤 2,505 元，收盤 2,500 元，前一交易日收盤 2,510 元">
+        <!-- 刻度：2490 到 2520，x = 40 + (價格 − 2490) / 30 × 620 -->
+        <rect class="bar" x="143.3" y="88" width="413.4" height="20" rx="4"/>
+        <line class="prev" x1="453.3" y1="50" x2="453.3" y2="132"/>
+        <line class="stem" x1="246.7" y1="50" x2="246.7" y2="91"/>
+        <line class="stem" x1="350" y1="50" x2="350" y2="91"/>
+        <circle class="m-close" cx="246.7" cy="98" r="8"/>
+        <circle class="m-open" cx="350" cy="98" r="8"/>
+        <text x="246.7" y="40" text-anchor="middle">收盤 <tspan class="mono">2,500</tspan></text>
+        <text x="350" y="40" text-anchor="middle">開盤 <tspan class="mono">2,505</tspan></text>
+        <text x="453.3" y="40" text-anchor="middle">前收 <tspan class="mono">2,510</tspan></text>
+        <text x="143.3" y="128" text-anchor="middle">最低 <tspan class="mono">2,495</tspan></text>
+        <text x="556.7" y="128" text-anchor="middle">最高 <tspan class="mono">2,515</tspan></text>
+        <line class="axis" x1="40" y1="150" x2="660" y2="150"/>
+        <g class="axis">
+          <line x1="40" y1="150" x2="40" y2="156"/>
+          <line x1="143.3" y1="150" x2="143.3" y2="156"/>
+          <line x1="246.7" y1="150" x2="246.7" y2="156"/>
+          <line x1="350" y1="150" x2="350" y2="156"/>
+          <line x1="453.3" y1="150" x2="453.3" y2="156"/>
+          <line x1="556.7" y1="150" x2="556.7" y2="156"/>
+          <line x1="660" y1="150" x2="660" y2="156"/>
+        </g>
+        <g class="axis-text mono" text-anchor="middle">
+          <text x="40" y="174" class="axis-text mono">2,490</text>
+          <text x="143.3" y="174" class="axis-text mono">2,495</text>
+          <text x="246.7" y="174" class="axis-text mono">2,500</text>
+          <text x="350" y="174" class="axis-text mono">2,505</text>
+          <text x="453.3" y="174" class="axis-text mono">2,510</text>
+          <text x="556.7" y="174" class="axis-text mono">2,515</text>
+          <text x="660" y="174" class="axis-text mono">2,520</text>
+        </g>
+      </svg>
+    </div>
+    <p class="cap">圖：2026-10-02 當日價格（元）。實心圓是收盤，空心圓是開盤，虛線是前一交易日（2026-10-01）收盤。振幅 0.80% 是用（最高 2,515 − 最低 2,495）÷ 前收 2,510 自行計算，Yahoo奇摩股市也顯示 0.80%。價格來源：證交所。</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-data">
+    <h2 id="h-data">行情數據（每項標明日期與來源）</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th scope="col">項目</th><th scope="col">數值</th><th scope="col">資料日期</th><th scope="col">來源</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="k">收盤價</td>
+            <td class="v">2,500.00 元</td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">漲跌</td>
+            <td class="v dn">−10.00 元</td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">漲跌幅</td>
+            <td class="v dn">−0.40%<small>−10 ÷ 2,510 = −0.398%，自行驗算</small></td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://tw.stock.yahoo.com/quote/2330.TW" target="_blank" rel="noopener">Yahoo奇摩股市</a>（顯示 −0.40%）；<a href="https://www.cnyes.com/twstock/2330" target="_blank" rel="noopener">鉅亨網</a>（顯示 −0.40%）</td>
+          </tr>
+          <tr>
+            <td class="k">成交量</td>
+            <td class="v">15,792 張<small>15,792,206 股</small></td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">成交金額</td>
+            <td class="v">395.08 億元<small>39,508,159,297 元；成交筆數 65,783</small></td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">開盤 / 最高 / 最低</td>
+            <td class="v">2,505 / 2,515 / 2,495</td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">前一交易日收盤</td>
+            <td class="v">2,510.00 元<small>當日上漲 30.00 元</small></td>
+            <td class="d">2026-10-01</td>
+            <td class="s"><a href="https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=20261002&amp;stockNo=2330&amp;response=json" target="_blank" rel="noopener">臺灣證券交易所　個股日成交資訊</a></td>
+          </tr>
+          <tr>
+            <td class="k">加權指數（大盤）</td>
+            <td class="v">48,476 點<small>上漲 122 點（+0.25%），創收盤新高</small></td>
+            <td class="d">2026-10-02</td>
+            <td class="s"><a href="https://finance.ettoday.net/news/3247799" target="_blank" rel="noopener">ETtoday 新聞雲</a>；<a href="https://finance.ftvnews.com.tw/news/detail/2026A02W0425" target="_blank" rel="noopener">民視財經網</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note"><b>成交量為什麼各站不同：</b>證交所與鉅亨網都是 15,792 張；Yahoo奇摩股市顯示 13,902 張（14:30 資料）；聚財網顯示 15,146 張（<a href="https://stock.wearn.com/cdata.asp?kind=2330" target="_blank" rel="noopener">連結</a>）。差距可能來自是否計入零股、盤後定價與鉅額交易，各站沒有在頁面上說明，這是推測。本頁採用證交所的官方數字，它註明含一般、零股、盤後定價與鉅額交易。</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-news">
+    <h2 id="h-news">相關新聞</h2>
+    <ul class="news">
+      <li>
+        <p class="meta"><span class="num">2026-10-02 15:21</span>　民視財經網</p>
+        <h3>台股收在48476點再創新高 台積電反下跌10元重回2500元</h3>
+        <p>美股四大指數上漲，台股開高走高並創收盤新高。台積電下跌 10 元、收 2,500 元，走勢與大盤相反。</p>
+        <a class="link" href="https://finance.ftvnews.com.tw/news/detail/2026A02W0425" target="_blank" rel="noopener">閱讀原文</a>
+      </li>
+      <li>
+        <p class="meta"><span class="num">2026-10-01 13:53</span>　中央社（華視新聞網轉載）</p>
+        <h3>台股48353點創收盤新高 台積電收2510元</h3>
+        <p>前一個交易日台股收 48,353.49 點，上漲 413.36 點。台積電上漲 30 元、收 2,510 元，漲幅 1.21%。</p>
+        <a class="link" href="https://news.cts.com.tw/cna/money/202610/202610013084985.html" target="_blank" rel="noopener">閱讀原文</a>
+      </li>
+    </ul>
+    <p class="cap">新聞摘要為本頁整理，細節以原文為準。</p>
+  </section>
+
+  <footer>
+    <p class="disclaimer">僅供課堂示範，非投資建議</p>
+    <p>資料整理日 2026-10-03。收盤價、漲跌、成交量以證交所公布的 2026-10-02 資料為準；漲跌幅與振幅的驗算是自行計算。本檔為靜態頁面，不會即時更新，之後的行情請自行查詢。</p>
+  </footer>
+</main>
+</body>
+
+</html>
